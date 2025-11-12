@@ -12,6 +12,7 @@ export default function Register() {
     password: '',
     confirmPassword: '',
     role: 'user'
+    
   })
   const [loading, setLoading] = useState(false)
 
