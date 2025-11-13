@@ -1,6 +1,6 @@
 /**
  * Tipos para Sprint 2
- * Versión inicial (Sesión 1)
+ * Versión final (Sesión 2)
  */
 
 export interface Song {
@@ -11,6 +11,9 @@ export interface Song {
   genre: string
   file_path: string
   cover_image?: string | null
+  cover_url?: string | null  // Alias para compatibilidad
+  album_id?: number | null
+  is_approved: boolean
   created_at: string
   user_id: number
 }
@@ -31,4 +34,19 @@ export interface User {
   email: string
   full_name?: string | null
   role: 'listener' | 'creator' | 'admin'
+}
+
+export interface PlayerState {
+  currentSong: Song | null
+  isPlaying: boolean
+  volume: number
+  queue: Song[]
+  currentIndex: number
+}
+
+export interface UploadResponse {
+  success: boolean
+  message: string
+  song_id?: number
+  album_id?: number
 }

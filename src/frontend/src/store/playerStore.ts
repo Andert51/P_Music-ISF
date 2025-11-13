@@ -6,7 +6,7 @@
 
 import { create } from 'zustand'
 import { Howl } from 'howler'
-import type { Song } from '../types/intex.ts'
+import type { Song } from '../types/intex'
 
 interface PlayerState {
   currentSong: Song | null
