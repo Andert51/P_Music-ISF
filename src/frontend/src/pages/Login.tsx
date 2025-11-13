@@ -21,11 +21,11 @@ export default function Login() {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
 
-      localStorage.setItem('sprint1_token', data.access_token)
+      localStorage.setItem('sprint2_token', data.access_token)
       
       // Obtener info del usuario
       const userResponse = await api.get('/auth/me')
-      localStorage.setItem('sprint1_user', JSON.stringify(userResponse.data))
+      localStorage.setItem('sprint2_user', JSON.stringify(userResponse.data))
 
       toast.success('¡Bienvenido de vuelta!')
       
@@ -117,5 +117,6 @@ export default function Login() {
         </div>
       </div>
     </div>
+    
   )
 }
