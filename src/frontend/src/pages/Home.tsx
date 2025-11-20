@@ -1,19 +1,11 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Play, Disc3, Music, LogOut } from 'lucide-react'
-import axios from 'axios'
+import { Play, Disc3, Music, LogOut, Heart, ListMusic } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
-
-interface Song {
-  id: number
-  title: string
-  artist: string
-  duration: number
-  file_path: string
-  cover_url: string | null
-  genre: string | null
-  play_count: number
-}
+import { usePlayerStore } from '../store/playerStore'
+import api from '../lib/api'
+import type { Song } from '../types'
 
 interface Album {
   id: number
@@ -24,15 +16,17 @@ interface Album {
 }
 
 export default function Home() {
+  const navigate = useNavigate()
   const [songs, setSongs] = useState<Song[]>([])
   const [albums, setAlbums] = useState<Album[]>([])
   const [loading, setLoading] = useState(true)
-  const [currentPlaying, setCurrentPlaying] = useState<number | null>(null)
   const [user, setUser] = useState<any>(null)
-  const API_URL = 'http://localhost:8001'
+
+  // Obtener acciones del player store
+  const { playSong, currentSong, isPlaying } = usePlayerStore()
 
   useEffect(() => {
-    const token = localStorage.getItem('sprint1_token')
+    const token = localStorage.getItem('sprint3_token')
     if (!token) {
       window.location.href = '/login'
       return
@@ -44,10 +38,7 @@ export default function Home() {
 
   const fetchUserData = async () => {
     try {
-      const token = localStorage.getItem('sprint1_token')
-      const response = await axios.get(`${API_URL}/mvp/sprint1/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const response = await api.get('/auth/me')
       setUser(response.data)
     } catch (error) {
       console.error('Error al cargar usuario:', error)
@@ -58,8 +49,8 @@ export default function Home() {
     try {
       setLoading(true)
       const [songsRes, albumsRes] = await Promise.all([
-        axios.get(`${API_URL}/mvp/sprint1/songs/?limit=12`),
-        axios.get(`${API_URL}/mvp/sprint1/albums/?limit=6`)
+        api.get('/songs/?limit=12'),
+        api.get('/albums/?limit=6')
       ])
       
       setSongs(songsRes.data)
@@ -75,13 +66,11 @@ export default function Home() {
   const handlePlay = async (song: Song) => {
     try {
       // Incrementar contador de reproducciones
-      await axios.post(`${API_URL}/mvp/sprint1/songs/${song.id}/play`)
+      await api.post(`/songs/${song.id}/play`)
       
-      setCurrentPlaying(song.id)
+      // Usar el player store para reproducir
+      playSong(song)
       toast.success(`Reproduciendo: ${song.title}`)
-      
-      // Aquí iría la lógica de reproducción con Howler.js o HTML5 Audio
-      // Por ahora solo simulamos
     } catch (error) {
       console.error('Error al reproducir:', error)
       toast.error('Error al reproducir canción')
@@ -89,8 +78,8 @@ export default function Home() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('sprint1_token')
-    localStorage.removeItem('sprint1_user')
+    localStorage.removeItem('sprint3_token')
+    localStorage.removeItem('sprint3_user')
     toast.success('Sesión cerrada')
     // Usar window.location para forzar recarga
     setTimeout(() => {
@@ -104,10 +93,16 @@ export default function Home() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const getFileUrl = (path: string | null) => {
+  const getFileUrl = (path: string | null | undefined) => {
     if (!path) return 'https://via.placeholder.com/300x300?text=No+Cover'
     if (path.startsWith('http')) return path
-    return `${API_URL}${path}`
+    return `http://localhost:8003${path}`
+  }
+
+  // Helper para obtener cover de canción (soporta cover_image y cover_url)
+  const getSongCover = (song: Song) => {
+    const coverPath = song.cover_image || song.cover_url
+    return getFileUrl(coverPath)
   }
 
   if (loading) {
@@ -127,7 +122,7 @@ export default function Home() {
             <Music className="w-8 h-8 text-purple-400" />
             <div>
               <h1 className="text-2xl font-bold text-white">P-Music TD</h1>
-              <p className="text-sm text-purple-300">Sprint 1 - MVP</p>
+              <p className="text-sm text-purple-300">Sprint 3 - Player + Upload</p>
             </div>
           </div>
           
@@ -182,7 +177,7 @@ export default function Home() {
               >
                 <div className="relative aspect-square">
                   <img
-                    src={getFileUrl(song.cover_url)}
+                    src={getSongCover(song)}
                     alt={song.title}
                     className="w-full h-full object-cover"
                   />
@@ -191,7 +186,7 @@ export default function Home() {
                     className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
                   >
                     <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                      currentPlaying === song.id
+                      currentSong?.id === song.id
                         ? 'bg-green-500 animate-pulse'
                         : 'bg-purple-500 hover:bg-purple-600'
                     } transition-all`}>
@@ -203,9 +198,30 @@ export default function Home() {
                 <div className="p-4">
                   <h4 className="text-white font-semibold truncate">{song.title}</h4>
                   <p className="text-purple-300 text-sm truncate">{song.artist}</p>
-                  <div className="flex justify-between items-center mt-2">
+                  <div className="flex justify-between items-center mt-3 gap-2">
                     <span className="text-xs text-purple-400">{formatDuration(song.duration)}</span>
-                    <span className="text-xs text-purple-400">{song.play_count} plays</span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toast.success('Agregado a favoritas')
+                        }}
+                        className="p-2 rounded-full bg-gray-800/50 hover:bg-purple-500/20 text-gray-400 hover:text-pink-400 transition"
+                        aria-label="Like"
+                      >
+                        <Heart className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toast.success('Función próximamente')
+                        }}
+                        className="p-2 rounded-full bg-gray-800/50 hover:bg-purple-500/20 text-gray-400 hover:text-purple-400 transition"
+                        aria-label="Add to playlist"
+                      >
+                        <ListMusic className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   {song.genre && (
                     <span className="inline-block mt-2 px-2 py-1 bg-purple-500/20 text-purple-300 text-xs rounded">
@@ -239,7 +255,8 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 whileHover={{ y: -5 }}
-                className="bg-white/5 backdrop-blur-xl rounded-xl overflow-hidden border border-white/10 hover:border-purple-500/50 transition-all"
+                onClick={() => navigate(`/albums/${album.id}`)}
+                className="bg-white/5 backdrop-blur-xl rounded-xl overflow-hidden border border-white/10 hover:border-purple-500/50 transition-all cursor-pointer"
               >
                 <div className="relative aspect-square">
                   <img
