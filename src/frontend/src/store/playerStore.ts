@@ -1,12 +1,6 @@
-/**
- * Player Store - Sprint 2
- * Versión final (Sesión 2)
- * Se añade soporte para colas de reproducción y control de canciones
- */
-
 import { create } from 'zustand'
 import { Howl } from 'howler'
-import type { Song } from '../types/intex'
+import type { Song } from '../types'
 
 interface PlayerState {
   currentSong: Song | null
@@ -15,8 +9,8 @@ interface PlayerState {
   queue: Song[]
   currentIndex: number
   howl: Howl | null
-
-  // Acciones completas
+  
+  // Actions
   playSong: (song: Song) => void
   playQueue: (songs: Song[], startIndex: number) => void
   togglePlay: () => void
@@ -36,22 +30,33 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   playSong: (song: Song) => {
     const { howl } = get()
-    if (howl) howl.unload()
+    
+    if (howl) {
+      howl.unload()
+    }
 
-    const audioUrl = song.file_path.startsWith('http')
-      ? song.file_path
-      : `http://localhost:8002${song.file_path}`
+    // Construir URL completa para el audio
+    const audioUrl = song.file_path.startsWith('http') 
+      ? song.file_path 
+      : `http://localhost:8003${song.file_path}`
 
     const newHowl = new Howl({
       src: [audioUrl],
-      html5: true,
+      html5: true, // HTML5 Audio con CORS configurado
       volume: get().volume,
       format: ['mp3'],
-      onloaderror: (_id, error) => console.error('❌ Error cargando audio:', error),
-      onend: () => get().nextSong(),
+      onloaderror: (_id, error) => {
+        console.error('❌ Error cargando audio:', error)
+      },
+      onend: () => {
+        get().nextSong()
+      },
       onplayerror: (_id, error) => {
         console.error('❌ Error reproduciendo:', error)
-        newHowl.once('unlock', () => newHowl.play())
+        // Intentar desbloquear y reproducir nuevamente
+        newHowl.once('unlock', () => {
+          newHowl.play()
+        })
       },
     })
 
@@ -61,54 +66,74 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   playQueue: (songs: Song[], startIndex: number) => {
     if (songs.length === 0) return
+    
     const { howl } = get()
-    if (howl) howl.unload()
+    
+    if (howl) {
+      howl.unload()
+    }
 
     const song = songs[startIndex]
-    const audioUrl = song.file_path.startsWith('http')
-      ? song.file_path
-      : `http://localhost:8002${song.file_path}`
+    
+    // Construir URL completa para el audio
+    const audioUrl = song.file_path.startsWith('http') 
+      ? song.file_path 
+      : `http://localhost:8003${song.file_path}`
 
     const newHowl = new Howl({
       src: [audioUrl],
-      html5: true,
+      html5: true, // HTML5 Audio con CORS configurado
       volume: get().volume,
       format: ['mp3'],
-      onloaderror: (_id, error) => console.error('❌ Error cargando audio:', error),
-      onend: () => get().nextSong(),
+      onloaderror: (_id, error) => {
+        console.error('❌ Error cargando audio:', error)
+      },
+      onend: () => {
+        get().nextSong()
+      },
       onplayerror: (_id, error) => {
         console.error('❌ Error reproduciendo:', error)
-        newHowl.once('unlock', () => newHowl.play())
+        // Intentar desbloquear y reproducir nuevamente
+        newHowl.once('unlock', () => {
+          newHowl.play()
+        })
       },
     })
 
     newHowl.play()
-    set({
-      currentSong: song,
-      howl: newHowl,
-      isPlaying: true,
-      queue: songs,
-      currentIndex: startIndex,
+    set({ 
+      currentSong: song, 
+      howl: newHowl, 
+      isPlaying: true, 
+      queue: songs, 
+      currentIndex: startIndex 
     })
   },
 
   togglePlay: () => {
     const { howl, isPlaying } = get()
-    if (!howl) return
-
-    if (isPlaying) howl.pause()
-    else howl.play()
-
-    set({ isPlaying: !isPlaying })
+    
+    if (howl) {
+      if (isPlaying) {
+        howl.pause()
+      } else {
+        howl.play()
+      }
+      set({ isPlaying: !isPlaying })
+    }
   },
 
   nextSong: () => {
     const { queue, currentIndex } = get()
-    if (currentIndex < queue.length - 1) get().playQueue(queue, currentIndex + 1)
+    
+    if (currentIndex < queue.length - 1) {
+      get().playQueue(queue, currentIndex + 1)
+    }
   },
 
   previousSong: () => {
     const { queue, currentIndex, howl } = get()
+    
     if (howl && howl.seek() > 3) {
       howl.seek(0)
     } else if (currentIndex > 0) {
@@ -118,12 +143,19 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   setVolume: (volume: number) => {
     const { howl } = get()
-    if (howl) howl.volume(volume)
+    
+    if (howl) {
+      howl.volume(volume)
+    }
     set({ volume })
   },
 
   seek: (time: number) => {
     const { howl } = get()
-    if (howl) howl.seek(time)
+    
+    if (howl) {
+      howl.seek(time)
+    }
   },
 }))
+
