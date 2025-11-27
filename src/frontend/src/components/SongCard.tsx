@@ -1,35 +1,35 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Play, Pause } from 'lucide-react';
-import { Song } from '@/types';
-import { usePlayerStore } from '@/store/playerStore';
+import React from 'react'
+import { motion } from 'framer-motion'
+import { Play, Pause } from 'lucide-react'
+import { Song } from '@/types'
+import { usePlayerStore } from '@/store/playerStore'
 
 interface SongCardProps {
-  song: Song;
-  index: number;
-  allSongs: Song[];
+  song: Song
+  index: number
+  allSongs: Song[]
 }
 
 export const SongCard: React.FC<SongCardProps> = ({ song, index, allSongs }) => {
-  const { currentSong, isPlaying, playSong, togglePlay, playQueue } = usePlayerStore();
-  const isCurrentSong = currentSong?.id === song.id;
+  const { currentSong, isPlaying, playSong, togglePlay, playQueue } = usePlayerStore()
+  const isCurrentSong = currentSong?.id === song.id
 
   const handlePlay = () => {
     if (isCurrentSong) {
-      togglePlay();
+      togglePlay()
     } else {
-      playQueue(allSongs, index);
+      playQueue(allSongs, index)
     }
-  };
+  }
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: index * 0.05 }}
-      className="card group relative"
+      transition={{ delay: index * 0.04 }}
+      className="group relative bg-gruvbox-bg1 rounded-xl shadow-lg hover:shadow-gruvbox-aqua/30 p-4 cursor-pointer hover:scale-105 transition-all"
     >
-      <div className="relative aspect-square mb-4 rounded-md overflow-hidden">
+      <div className="relative aspect-square mb-4 rounded-lg overflow-hidden">
         <img
           src={song.cover_url || '/placeholder-album.jpg'}
           alt={song.title}
@@ -41,7 +41,7 @@ export const SongCard: React.FC<SongCardProps> = ({ song, index, allSongs }) => 
           className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={handlePlay}
         >
-          <div className="bg-primary rounded-full p-4 hover:scale-110 transition-transform">
+          <div className="bg-gruvbox-aqua rounded-full p-4 hover:scale-110 transition-transform">
             {isCurrentSong && isPlaying ? (
               <Pause className="w-6 h-6 text-white" fill="currentColor" />
             ) : (
@@ -50,17 +50,15 @@ export const SongCard: React.FC<SongCardProps> = ({ song, index, allSongs }) => 
           </div>
         </motion.button>
       </div>
-
-      <h3 className="text-white font-semibold truncate mb-1">{song.title}</h3>
-      <p className="text-gray-400 text-sm truncate">{song.artist}</p>
-      
+      <h3 className="text-gruvbox-fg font-semibold truncate mb-1">{song.title}</h3>
+      <p className="text-gruvbox-fg4 text-sm truncate">{song.artist}</p>
       {isCurrentSong && (
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: '100%' }}
-          className="absolute bottom-0 left-0 h-1 bg-primary"
+          className="absolute bottom-0 left-0 h-1 bg-gruvbox-aqua"
         />
       )}
     </motion.div>
-  );
-};
+  )
+}
