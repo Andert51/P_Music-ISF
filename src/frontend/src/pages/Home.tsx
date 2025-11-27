@@ -1,296 +1,432 @@
-import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
-import { Play, Disc3, Music, LogOut } from 'lucide-react'
-import axios from 'axios'
-import { toast } from 'react-hot-toast'
+import React, { useEffect, useState, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { Play, Flame, Disc3, Heart, Sparkles, Music, Plus, ListMusic } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import api from '@/lib/axios';
+import { Song, Album } from '@/types';
+import { usePlayerStore } from '@/store/playerStore';
+import { toast } from 'react-hot-toast';
+import { getFileUrl } from '@/lib/utils';
+import { AddToPlaylistModal } from '@/components/AddToPlaylistModal';
 
-interface Song {
-  id: number
-  title: string
-  artist: string
-  duration: number
-  file_path: string
-  cover_url: string | null
-  genre: string | null
-  play_count: number
-}
+export const Home: React.FC = () => {
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [likedSongs, setLikedSongs] = useState<Set<number>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [selectedSong, setSelectedSong] = useState<{ id: number; title: string } | null>(null);
+  const { playQueue, currentSong, isPlaying } = usePlayerStore();
+  const floatingOrbs = useRef<(HTMLDivElement | null)[]>([]);
 
-interface Album {
-  id: number
-  title: string
-  description: string | null
-  cover_image: string | null
-  release_date: string | null
-}
-
-export default function Home() {
-  const [songs, setSongs] = useState<Song[]>([])
-  const [albums, setAlbums] = useState<Album[]>([])
-  const [loading, setLoading] = useState(true)
-  const [currentPlaying, setCurrentPlaying] = useState<number | null>(null)
-  const [user, setUser] = useState<any>(null)
-  const API_URL = 'http://localhost:8001'
+  // Simple floating animation with CSS
+  useEffect(() => {
+    floatingOrbs.current.forEach((orb, index) => {
+      if (!orb) return;
+      
+      const duration = 8 + Math.random() * 4;
+      const delay = index * 0.5;
+      
+      orb.style.animation = `float-${index % 3} ${duration}s ease-in-out ${delay}s infinite`;
+    });
+  }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('sprint1_token')
-    if (!token) {
-      window.location.href = '/login'
-      return
-    }
-    
-    fetchUserData()
-    fetchData()
-  }, [])
-
-  const fetchUserData = async () => {
-    try {
-      const token = localStorage.getItem('sprint1_token')
-      const response = await axios.get(`${API_URL}/mvp/sprint1/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setUser(response.data)
-    } catch (error) {
-      console.error('Error al cargar usuario:', error)
-    }
-  }
+    fetchData();
+  }, []);
 
   const fetchData = async () => {
     try {
-      setLoading(true)
+      setLoading(true);
       const [songsRes, albumsRes] = await Promise.all([
-        axios.get(`${API_URL}/mvp/sprint1/songs/?limit=12`),
-        axios.get(`${API_URL}/mvp/sprint1/albums/?limit=6`)
-      ])
+        api.get('/songs/', { params: { limit: 20, approved_only: true, order_by: 'play_count' } }),
+        api.get('/albums/', { params: { limit: 6, approved_only: true } })
+      ]);
+      setSongs(songsRes.data);
+      setAlbums(albumsRes.data);
       
-      setSongs(songsRes.data)
-      setAlbums(albumsRes.data)
+      // Obtener canciones liked
+      try {
+        const likedRes = await api.get('/songs/liked/all');
+        console.log('Liked songs response:', likedRes.data);
+        const likedIds = new Set(likedRes.data.map((song: Song) => song.id));
+        console.log('Liked IDs:', Array.from(likedIds));
+        setLikedSongs(likedIds);
+      } catch (error) {
+        // Si falla (ej. no autenticado), continuar sin likes
+        console.error('Error al cargar likes:', error);
+      }
     } catch (error) {
-      console.error('Error al cargar datos:', error)
-      toast.error('Error al cargar contenido')
+      console.error('Error:', error);
+      toast.error('Error al cargar contenido');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const handlePlay = async (song: Song) => {
+  const handleLikeSong = async (songId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
     try {
-      // Incrementar contador de reproducciones
-      await axios.post(`${API_URL}/mvp/sprint1/songs/${song.id}/play`)
+      if (likedSongs.has(songId)) {
+        // Unlike
+        await api.delete(`/songs/${songId}/like`);
+        setLikedSongs(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(songId);
+          return newSet;
+        });
+        toast.success('Eliminado de favoritos');
+      } else {
+        // Like
+        await api.post(`/songs/${songId}/like`);
+        setLikedSongs(prev => new Set(prev).add(songId));
+        toast.success('¡Agregado a favoritos!');
+      }
+    } catch (error: any) {
+      console.error('Error al dar like:', error);
+      console.error('Response:', error.response?.data);
       
-      setCurrentPlaying(song.id)
-      toast.success(`Reproduciendo: ${song.title}`)
-      
-      // Aquí iría la lógica de reproducción con Howler.js o HTML5 Audio
-      // Por ahora solo simulamos
-    } catch (error) {
-      console.error('Error al reproducir:', error)
-      toast.error('Error al reproducir canción')
+      // Si ya está likeada, actualizar el estado local
+      if (error.response?.data?.detail === "Song already liked") {
+        setLikedSongs(prev => new Set(prev).add(songId));
+        toast.success('¡Agregado a favoritos!');
+      } else if (error.response?.status === 401) {
+        toast.error('Inicia sesión para guardar favoritos');
+      } else {
+        toast.error('Error al actualizar favoritos');
+      }
     }
-  }
+  };
 
-  const handleLogout = () => {
-    localStorage.removeItem('sprint1_token')
-    localStorage.removeItem('sprint1_user')
-    toast.success('Sesión cerrada')
-    // Usar window.location para forzar recarga
-    setTimeout(() => {
-      window.location.href = '/login'
-    }, 500)
-  }
-
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const getFileUrl = (path: string | null) => {
-    if (!path) return 'https://via.placeholder.com/300x300?text=No+Cover'
-    if (path.startsWith('http')) return path
-    return `${API_URL}${path}`
-  }
+  const handlePlaySong = (_song: Song, index: number) => {
+    playQueue(songs, index);
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Cargando...</div>
+      <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-500"></div>
+          <p className="text-gray-400">Cargando...</p>
+        </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Header con usuario */}
-      <header className="bg-black/30 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <Music className="w-8 h-8 text-purple-400" />
-            <div>
-              <h1 className="text-2xl font-bold text-white">P-Music TD</h1>
-              <p className="text-sm text-purple-300">Sprint 1 - MVP</p>
-            </div>
-          </div>
+    <div className="space-y-12 pb-32">
+      {/* Floating Orbs Background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        {[...Array(8)].map((_, i) => {
+          const sizes = [150, 200, 250, 180, 220, 280, 160, 240];
+          const positions = [
+            { left: '10%', top: '20%' },
+            { left: '80%', top: '15%' },
+            { left: '5%', top: '70%' },
+            { left: '90%', top: '60%' },
+            { left: '45%', top: '10%' },
+            { left: '70%', top: '85%' },
+            { left: '20%', top: '50%' },
+            { left: '60%', top: '40%' },
+          ];
           
-          {user && (
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-white font-medium">{user.username}</p>
-                <p className="text-sm text-purple-300 capitalize">{user.role}</p>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 transition-colors"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
-          )}
+          return (
+            <div
+              key={i}
+              ref={(el) => {
+                if (el) floatingOrbs.current[i] = el;
+              }}
+              className="absolute rounded-full blur-3xl animate-breathe"
+              style={{
+                width: sizes[i] + 'px',
+                height: sizes[i] + 'px',
+                left: positions[i].left,
+                top: positions[i].top,
+                background: [
+                  'radial-gradient(circle, rgba(142, 192, 124, 0.3), transparent)',
+                  'radial-gradient(circle, rgba(211, 134, 155, 0.3), transparent)',
+                  'radial-gradient(circle, rgba(131, 165, 152, 0.3), transparent)',
+                  'radial-gradient(circle, rgba(250, 189, 47, 0.3), transparent)',
+                  'radial-gradient(circle, rgba(254, 128, 25, 0.3), transparent)',
+                ][i % 5],
+                animationDelay: `${i * 0.5}s`,
+                animationDuration: `${8 + i}s`,
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Hero Section - Gruvbox Style with Better Visibility */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gruvbox-aqua via-gruvbox-purple to-gruvbox-blue p-16 z-10"
+        style={{ boxShadow: '0 20px 60px rgba(142, 192, 124, 0.4)' }}
+      >
+        <div className="relative z-10">
+          <motion.h1 
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="text-7xl font-black text-gruvbox-bg drop-shadow-lg mb-6"
+          >
+            Descubre nueva música
+          </motion.h1>
+          <motion.p 
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-2xl text-gruvbox-bg/90 font-semibold mb-10 max-w-2xl drop-shadow"
+          >
+            Explora millones de canciones, álbumes y artistas
+          </motion.p>
+          <motion.button 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.4, type: 'spring', stiffness: 200 }}
+            whileHover={{ scale: 1.08, y: -3 }}
+            whileTap={{ scale: 0.95 }}
+            className="bg-gruvbox-bg text-gruvbox-fg font-bold px-10 py-5 rounded-full hover:shadow-2xl hover:shadow-gruvbox-bg/50 transition-all flex items-center gap-3 border-4 border-gruvbox-bg/30"
+          >
+            <Play size={24} fill="currentColor" className="text-gruvbox-aqua" />
+            <span className="text-lg">Reproducir ahora</span>
+          </motion.button>
         </div>
-      </header>
+        
+        {/* Decorative animated elements */}
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.2, 1],
+            rotate: [0, 180, 360],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute top-0 right-0 w-96 h-96 bg-gruvbox-yellow/20 rounded-full blur-3xl"
+        />
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.3, 1],
+            rotate: [360, 180, 0],
+          }}
+          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+          className="absolute bottom-0 left-1/3 w-80 h-80 bg-gruvbox-orange/20 rounded-full blur-3xl"
+        />
+      </motion.div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Hero Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-xl rounded-3xl p-8 mb-12 border border-white/10"
-        >
-          <h2 className="text-4xl font-bold text-white mb-3">
-            ¡Bienvenido a P-Music! 🎵
-          </h2>
-          <p className="text-purple-200 text-lg">
-            Explora las canciones más populares y álbumes destacados
-          </p>
-        </motion.div>
+      {/* Quick Access Cards - Larger & More Aesthetic */}
+      <div className="grid grid-cols-3 gap-8">
+        {/* Playlists Card */}
+        <Link to="/library">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            whileHover={{ scale: 1.05, y: -8 }}
+            whileTap={{ scale: 0.98 }}
+            className="relative group bg-gradient-to-br from-gruvbox-bg1 to-gruvbox-bg2 rounded-3xl p-10 border-2 border-gruvbox-aqua/30 cursor-pointer overflow-hidden transition-all"
+            style={{ minHeight: '220px' }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-gruvbox-aqua/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute top-4 right-4 w-32 h-32 bg-gruvbox-aqua/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+            
+            <ListMusic className="w-16 h-16 text-gruvbox-aqua mb-6 relative z-10 group-hover:scale-125 group-hover:rotate-12 transition-all duration-300" strokeWidth={2.5} />
+            <h3 className="text-2xl font-bold mb-3 relative z-10 text-gruvbox-fg">Playlists</h3>
+            <p className="text-gruvbox-fg4 relative z-10 text-base">Tus colecciones musicales</p>
+            
+            <div className="absolute bottom-4 right-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Sparkles className="w-24 h-24 text-gruvbox-aqua" />
+            </div>
+          </motion.div>
+        </Link>
 
-        {/* Canciones Populares */}
-        <section className="mb-12">
-          <div className="flex items-center gap-3 mb-6">
-            <Disc3 className="w-6 h-6 text-purple-400" />
-            <h3 className="text-2xl font-bold text-white">Canciones Populares</h3>
+        {/* Álbumes Card */}
+        <Link to="/albums">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            whileHover={{ scale: 1.05, y: -8 }}
+            whileTap={{ scale: 0.98 }}
+            className="relative group bg-gradient-to-br from-gruvbox-bg1 to-gruvbox-bg2 rounded-3xl p-10 border-2 border-gruvbox-purple/30 cursor-pointer overflow-hidden transition-all"
+            style={{ minHeight: '220px' }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-gruvbox-purple/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute top-4 right-4 w-32 h-32 bg-gruvbox-purple/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+            
+            <Disc3 className="w-16 h-16 text-gruvbox-purple mb-6 relative z-10 group-hover:scale-125 group-hover:rotate-180 transition-all duration-500" strokeWidth={2.5} />
+            <h3 className="text-2xl font-bold mb-3 relative z-10 text-gruvbox-fg">Álbumes</h3>
+            <p className="text-gruvbox-fg4 relative z-10 text-base">Colecciones completas</p>
+            
+            <div className="absolute bottom-4 right-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Music className="w-24 h-24 text-gruvbox-purple" />
+            </div>
+          </motion.div>
+        </Link>
+
+        {/* Favoritas Card */}
+        <Link to="/liked">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            whileHover={{ scale: 1.05, y: -8 }}
+            whileTap={{ scale: 0.98 }}
+            className="relative group bg-gradient-to-br from-gruvbox-bg1 to-gruvbox-bg2 rounded-3xl p-10 border-2 border-gruvbox-red/30 cursor-pointer overflow-hidden transition-all"
+            style={{ minHeight: '220px' }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-gruvbox-red/10 via-gruvbox-purple/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute top-4 right-4 w-32 h-32 bg-gruvbox-red/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+            
+            <Heart className="w-16 h-16 text-gruvbox-red mb-6 relative z-10 group-hover:scale-125 group-hover:fill-gruvbox-red transition-all duration-300" strokeWidth={2.5} />
+            <h3 className="text-2xl font-bold mb-3 relative z-10 text-gruvbox-fg">Favoritas</h3>
+            <p className="text-gruvbox-fg4 relative z-10 text-base">Canciones que amas</p>
+            
+            <div className="absolute bottom-4 right-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Sparkles className="w-24 h-24 text-gruvbox-red" />
+            </div>
+          </motion.div>
+        </Link>
+      </div>
+
+      {/* Albums Section */}
+      {albums.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-3xl font-bold text-gruvbox-fg">Álbumes Destacados</h2>
+            <Link to="/albums" className="text-gruvbox-aqua hover:text-gruvbox-yellow font-semibold transition-colors">
+              Ver todos
+            </Link>
           </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            {albums.map((album) => (
+              <Link key={album.id} to={`/albums/${album.id}`}>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="group cursor-pointer"
+                >
+                  <div className="relative aspect-square rounded-xl overflow-hidden mb-4 bg-gruvbox-bg2 border-2 border-gruvbox-aqua/20 group-hover:border-gruvbox-aqua/60 transition-colors">
+                    <img
+                      src={getFileUrl(album.cover_image) || 'https://via.placeholder.com/300'}
+                      alt={album.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <motion.div 
+                        initial={{ y: 8 }}
+                        whileHover={{ y: 0 }}
+                        className="bg-gradient-to-br from-gruvbox-aqua to-gruvbox-purple rounded-full p-4 shadow-2xl"
+                      >
+                        <Play size={24} fill="white" className="text-white" />
+                      </motion.div>
+                    </div>
+                  </div>
+                  <h3 className="font-semibold text-gruvbox-fg truncate group-hover:text-gruvbox-aqua transition-colors">{album.title}</h3>
+                  <p className="text-sm text-gruvbox-fg4 truncate">Álbum</p>
+                </motion.div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {songs.map((song) => (
+      {/* Songs Section */}
+      {songs.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-3xl font-bold text-gruvbox-fg">Canciones Populares</h2>
+          </div>
+          <div className="space-y-2">
+            {songs.slice(0, 10).map((song, index) => (
               <motion.div
                 key={song.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ scale: 1.02 }}
-                className="bg-white/5 backdrop-blur-xl rounded-xl overflow-hidden border border-white/10 hover:border-purple-500/50 transition-all"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className={`group flex items-center gap-4 p-4 rounded-xl hover:bg-gruvbox-aqua/10 cursor-pointer transition-all border border-transparent hover:border-gruvbox-aqua/30 ${
+                  currentSong?.id === song.id && isPlaying ? 'bg-gruvbox-aqua/20 border-gruvbox-aqua/50' : ''
+                }`}
               >
-                <div className="relative aspect-square">
+                <div className="w-12 h-12 flex items-center justify-center text-gruvbox-fg3 font-bold text-lg">
+                  {index + 1}
+                </div>
+                
+                <div 
+                  onClick={() => handlePlaySong(song, index)}
+                  className="relative w-16 h-16 flex-shrink-0"
+                >
                   <img
-                    src={getFileUrl(song.cover_url)}
+                    src={getFileUrl(song.cover_url) || 'https://via.placeholder.com/100'}
                     alt={song.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover rounded-lg border-2 border-gruvbox-aqua/20"
                   />
-                  <button
-                    onClick={() => handlePlay(song)}
-                    className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-                  >
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                      currentPlaying === song.id
-                        ? 'bg-green-500 animate-pulse'
-                        : 'bg-purple-500 hover:bg-purple-600'
-                    } transition-all`}>
-                      <Play className="w-8 h-8 text-white fill-white" />
-                    </div>
-                  </button>
-                </div>
-
-                <div className="p-4">
-                  <h4 className="text-white font-semibold truncate">{song.title}</h4>
-                  <p className="text-purple-300 text-sm truncate">{song.artist}</p>
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-xs text-purple-400">{formatDuration(song.duration)}</span>
-                    <span className="text-xs text-purple-400">{song.play_count} plays</span>
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-lg">
+                    <Play size={24} fill="white" className="text-white" />
                   </div>
-                  {song.genre && (
-                    <span className="inline-block mt-2 px-2 py-1 bg-purple-500/20 text-purple-300 text-xs rounded">
-                      {song.genre}
-                    </span>
-                  )}
                 </div>
-              </motion.div>
-            ))}
-          </div>
 
-          {songs.length === 0 && (
-            <div className="text-center py-12">
-              <Music className="w-16 h-16 text-purple-400 mx-auto mb-4" />
-              <p className="text-purple-300 text-lg">No hay canciones disponibles aún</p>
-            </div>
-          )}
-        </section>
+                <div 
+                  onClick={() => handlePlaySong(song, index)}
+                  className="flex-1 min-w-0"
+                >
+                  <h3 className="font-semibold text-gruvbox-fg truncate group-hover:text-gruvbox-aqua transition-colors">
+                    {song.title}
+                  </h3>
+                  <p className="text-sm text-gruvbox-fg4 truncate group-hover:text-gruvbox-fg3 transition-colors">{song.artist}</p>
+                </div>
 
-        {/* Álbumes Destacados */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <Disc3 className="w-6 h-6 text-purple-400" />
-            <h3 className="text-2xl font-bold text-white">Álbumes Destacados</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {albums.map((album) => (
-              <motion.div
-                key={album.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ y: -5 }}
-                className="bg-white/5 backdrop-blur-xl rounded-xl overflow-hidden border border-white/10 hover:border-purple-500/50 transition-all"
-              >
-                <div className="relative aspect-square">
-                  <img
-                    src={getFileUrl(album.cover_image)}
-                    alt={album.title}
-                    className="w-full h-full object-cover"
+                <motion.button
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={(e) => handleLikeSong(song.id, e)}
+                  className={`p-2 transition-opacity ${
+                    likedSongs.has(song.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  }`}
+                >
+                  <Heart 
+                    className={`w-6 h-6 transition-all ${
+                      likedSongs.has(song.id) 
+                        ? 'text-gruvbox-red fill-gruvbox-red' 
+                        : 'text-gruvbox-fg4 hover:text-gruvbox-red'
+                    }`}
                   />
-                </div>
+                </motion.button>
 
-                <div className="p-4">
-                  <h4 className="text-white font-bold text-lg truncate">{album.title}</h4>
-                  {album.description && (
-                    <p className="text-purple-300 text-sm mt-1 line-clamp-2">{album.description}</p>
-                  )}
-                  {album.release_date && (
-                    <p className="text-purple-400 text-xs mt-2">
-                      {new Date(album.release_date).getFullYear()}
-                    </p>
-                  )}
+                <motion.button
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedSong({ id: song.id, title: song.title });
+                    setShowPlaylistModal(true);
+                  }}
+                  className="p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Plus className="w-6 h-6 text-gruvbox-fg4 hover:text-gruvbox-aqua transition-colors" />
+                </motion.button>
+
+                <div className="text-gruvbox-fg3 text-sm font-mono font-semibold">
+                  {Math.floor(song.duration / 60)}:{String(Math.floor(song.duration % 60)).padStart(2, '0')}
                 </div>
               </motion.div>
             ))}
           </div>
+        </div>
+      )}
 
-          {albums.length === 0 && (
-            <div className="text-center py-12">
-              <Disc3 className="w-16 h-16 text-purple-400 mx-auto mb-4" />
-              <p className="text-purple-300 text-lg">No hay álbumes disponibles aún</p>
-            </div>
-          )}
-        </section>
-
-        {/* Info Sprint */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-12 text-center"
-        >
-          <div className="bg-purple-500/10 backdrop-blur-xl rounded-xl p-6 border border-purple-500/30">
-            <h3 className="text-xl font-bold text-white mb-2">📌 Sprint 1 - Fundamentos</h3>
-            <p className="text-purple-300">
-              ✅ Autenticación | ✅ Ver canciones | ✅ Ver álbumes | ✅ Player básico
-            </p>
-            <p className="text-purple-400 text-sm mt-2">
-              Próximo sprint: Subida de canciones y gestión de álbumes
-            </p>
-          </div>
-        </motion.div>
-      </div>
+      {/* Add to Playlist Modal */}
+      {selectedSong && (
+        <AddToPlaylistModal
+          isOpen={showPlaylistModal}
+          onClose={() => {
+            setShowPlaylistModal(false);
+            setSelectedSong(null);
+          }}
+          songId={selectedSong.id}
+          songTitle={selectedSong.title}
+        />
+      )}
     </div>
-  )
-}
+  );
+};
 
