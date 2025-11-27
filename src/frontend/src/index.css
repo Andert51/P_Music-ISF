@@ -2,30 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* --- ANIMACIONES --- */
 @keyframes rainbow {
-  0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 200% 50%;
-  }
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
 }
 
 @keyframes breathe {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.3;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.5;
-  }
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.1); opacity: 0.5; }
 }
 
 .animate-breathe {
   animation: breathe 4s ease-in-out infinite;
 }
 
+/* --- ESTILOS BASE --- */
 * {
   margin: 0;
   padding: 0;
@@ -38,69 +30,66 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #1d2021; /* Fondo base oscuro (Gruvbox Dark Hard) */
+  color: #ebdbb2; /* Texto base (Gruvbox Light) */
 }
 
+/* --- SCROLLBARS MODERNOS --- */
+/* Funciona en Chrome, Edge, Safari */
 ::-webkit-scrollbar {
-  width: 12px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
   background: #282828;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #8ec07c;
-  border-radius: 6px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #fabd2f;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #1d2021;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #8ec07c;
   border-radius: 4px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #d3869b;
+::-webkit-scrollbar-thumb {
+  background: #504945;
+  border-radius: 4px;
+  border: 2px solid #282828; /* Efecto de padding */
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3E3E3E;
+  background: #8ec07c; /* Verde Gruvbox al hacer hover */
 }
 
+/* --- COMPONENTES TAILWIND --- */
 @layer components {
+  /* Botones */
   .btn-primary {
-    @apply bg-primary hover:bg-primary-light text-white font-semibold py-3 px-6 rounded-full transition-all duration-200 transform hover:scale-105;
+    @apply bg-primary hover:bg-primary-light text-white font-semibold py-3 px-6 rounded-full transition-all duration-200 transform hover:scale-105 shadow-lg;
   }
   
   .btn-secondary {
-    @apply bg-dark-300 hover:bg-dark-400 text-white font-semibold py-3 px-6 rounded-full transition-all duration-200;
+    @apply bg-dark-300 hover:bg-dark-400 text-white font-semibold py-3 px-6 rounded-full transition-all duration-200 border border-transparent hover:border-gray-600;
   }
   
+  /* Cards mejoradas con efecto de "flotar" */
   .card {
-    @apply bg-dark-200 rounded-lg p-4 hover:bg-dark-300 transition-all duration-200 cursor-pointer;
+    @apply bg-dark-200 rounded-xl p-4 transition-all duration-300 cursor-pointer relative overflow-hidden border border-transparent;
+  }
+
+  .card:hover {
+    @apply bg-dark-300 -translate-y-1 shadow-xl border-gray-700;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
   }
 }
 
+/* --- UTILIDADES PERSONALIZADAS --- */
+
+/* Inputs unificados (Reemplaza a .input y .input-field) */
 .input {
   background-color: #3c3836;
   color: #ebdbb2;
-  border: 2px solid rgba(142, 192, 124, 0.2);
-  border-radius: 0.5rem;
+  border: 1px solid rgba(142, 192, 124, 0.2); /* Borde verde sutil */
+  border-radius: 0.75rem;
   padding: 0.75rem 1rem;
   width: 100%;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: all 0.2s ease-in-out;
 }
 
 .input::placeholder {
@@ -111,25 +100,27 @@ body {
   outline: none;
   border-color: #8ec07c;
   background-color: #504945;
+  box-shadow: 0 0 0 3px rgba(142, 192, 124, 0.15); /* Resplandor al enfocar */
 }
 
-.input-field {
-  background-color: #3c3836;
-  color: #ebdbb2;
-  border: 2px solid rgba(142, 192, 124, 0.2);
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
-  width: 100%;
-  font-weight: 500;
-  transition: all 0.2s;
+/* Efecto Glassmorphism (Vidrio esmerilado) */
+.glass-panel {
+  background: rgba(40, 40, 40, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 }
 
-.input-field::placeholder {
-  color: #a89984;
-}
-
-.input-field:focus {
-  outline: none;
-  border-color: #8ec07c;
-  background-color: #504945;
+/* Texto Gradiente Animado (Usa tu keyframe rainbow) */
+.text-gradient-animate {
+  background: linear-gradient(
+    90deg, 
+    #8ec07c, #fabd2f, #d3869b, #8ec07c
+  );
+  background-size: 200% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: rainbow 4s linear infinite;
 }
