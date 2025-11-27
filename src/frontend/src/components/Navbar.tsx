@@ -1,72 +1,102 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Bell, User, LogOut } from 'lucide-react';
-import { useAuthStore } from '@/store/authStore';
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Search, User, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { useAuthStore } from '@/store/authStore'
 
-export const Navbar: React.FC = () => {
-  const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+export const TopNavbar: React.FC = () => {
+  const navigate = useNavigate()
+  const { user, logout } = useAuthStore()
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+    logout()
+    navigate('/login')
+  }
 
   return (
-    <div className="bg-dark-200/50 backdrop-blur-md sticky top-0 z-10 px-8 py-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => navigate(-1)}
-            className="bg-dark-300 rounded-full p-2 hover:bg-dark-400 transition"
+    <div className="bg-gradient-to-r from-gruvbox-bg via-gruvbox-bg0 to-gruvbox-bg border-b border-gruvbox-aqua/20 px-8 py-4 flex items-center justify-between sticky top-0 z-40 backdrop-blur-xl shadow-lg">
+      <div className="flex items-center gap-4">
+        <motion.button
+          whileHover={{ scale: 1.1, rotate: -10 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => navigate(-1)}
+          className="bg-gruvbox-bg1 hover:bg-gruvbox-aqua/20 rounded-full p-2.5 border border-gruvbox-aqua/20 hover:border-gruvbox-aqua/50 shadow-lg"
+        >
+          <ChevronLeft size={22} className="text-gruvbox-fg4 hover:text-gruvbox-aqua" />
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.1, rotate: 10 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => navigate(1)}
+          className="bg-gruvbox-bg1 hover:bg-gruvbox-aqua/20 rounded-full p-2.5 border border-gruvbox-aqua/20 hover:border-gruvbox-aqua/50 shadow-lg"
+        >
+          <ChevronRight size={22} className="text-gruvbox-fg4 hover:text-gruvbox-aqua" />
+        </motion.button>
+      </div>
+      <div className="flex-1 flex justify-center mx-8">
+        <motion.button
+          whileHover={{ scale: 1.15 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => navigate('/search')}
+          className="bg-gruvbox-bg1 hover:bg-gruvbox-aqua/20 rounded-full p-4 border-2 border-gruvbox-aqua/20 hover:border-gruvbox-aqua/60 shadow-lg group"
+          title="Buscar música"
+        >
+          <Search size={24} className="text-gruvbox-fg4 group-hover:text-gruvbox-aqua transition-colors" />
+        </motion.button>
+      </div>
+      <div className="relative">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setShowUserMenu(!showUserMenu)}
+          className="flex items-center gap-3 bg-gruvbox-bg1 hover:bg-gruvbox-bg2 rounded-full px-5 py-2.5 border-2 border-gruvbox-aqua/20 hover:border-gruvbox-purple/40 shadow-lg"
+        >
+          <motion.div 
+            className="w-9 h-9 bg-gradient-to-br from-gruvbox-aqua via-gruvbox-yellow to-gruvbox-purple rounded-full flex items-center justify-center shadow-xl"
+            animate={{
+              boxShadow: [
+                '0 0 15px rgba(142, 192, 124, 0.5)',
+                '0 0 20px rgba(211, 134, 155, 0.6)',
+                '0 0 15px rgba(142, 192, 124, 0.5)',
+              ]
+            }}
+            transition={{ duration: 2, repeat: Infinity }}
           >
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </motion.button>
-          
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => navigate(1)}
-            className="bg-dark-300 rounded-full p-2 hover:bg-dark-400 transition"
+            <User size={20} className="text-gruvbox-bg" />
+          </motion.div>
+          <span className="font-bold text-gruvbox-fg">{user?.username || 'Usuario'}</span>
+        </motion.button>
+        {showUserMenu && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute right-0 mt-2 w-56 bg-gruvbox-bg1 rounded-lg shadow-2xl border-2 border-gruvbox-aqua/30 overflow-hidden backdrop-blur-xl"
           >
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </motion.button>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="text-gray-400 hover:text-white transition"
-          >
-            <Bell className="w-6 h-6" />
-          </motion.button>
-
-          <div className="flex items-center space-x-3 bg-dark-300 rounded-full px-4 py-2">
-            <User className="w-5 h-5 text-white" />
-            <span className="text-white font-medium">{user?.username}</span>
-            <span className="text-xs bg-primary px-2 py-1 rounded-full text-white">
-              {user?.role}
-            </span>
-          </div>
-
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={handleLogout}
-            className="text-gray-400 hover:text-white transition"
-          >
-            <LogOut className="w-6 h-6" />
-          </motion.button>
-        </div>
+            <Link
+              to="/profile"
+              className="block px-4 py-3 hover:bg-gruvbox-aqua/20 text-gruvbox-fg hover:text-gruvbox-aqua font-semibold"
+              onClick={() => setShowUserMenu(false)}
+            >
+              <div className="flex items-center gap-3">
+                <User size={18} />
+                <span>Perfil</span>
+              </div>
+            </Link>
+            <div className="border-t border-gruvbox-aqua/20">
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-4 py-3 hover:bg-gruvbox-red/20 text-gruvbox-red hover:text-gruvbox-red font-semibold"
+              >
+                <div className="flex items-center gap-3">
+                  <LogOut size={18} />
+                  <span>Cerrar sesión</span>
+                </div>
+              </button>
+            </div>
+          </motion.div>
+        )}
       </div>
     </div>
-  );
-};
+  )
+}
